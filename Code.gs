@@ -17,52 +17,52 @@ function searchICDCodePublic(code) {
       if (!sheet) return;
 
       const lastRow = sheet.getLastRow();
-      const lastCol = sheet.getLastColumn();
-      if (!lastRow || !lastCol) return;
+      if (!lastRow) return;
 
-      const all = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+      const all = sheet.getRange(1, 1, lastRow, 2).getValues(); // только 2 колонки: код + название
 
       for (let r = 0; r < lastRow; r++) {
-        for (let c = 0; c < lastCol; c++) {
-          const val = all[r][c];
-          if (!val) continue;
+        const codeVal = all[r][0]; // первый столбец — код
+        if (!codeVal) continue;
 
-          const match = String(val).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
-          if (!match) continue;
+        const match = String(codeVal).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
+        if (!match) continue;
 
-          const cellCode = normalizeCode(match[0]);
-          if (cellCode === searchCode) {
-            let startRow = r + 1; // начинаем ниже найденного кода
-            let endRow = startRow;
+        const cellCode = normalizeCode(match[0]);
+        if (cellCode === searchCode) {
+          let startRow = r + 1;
+          let endRow = startRow;
 
-            // идём вниз, пока строка не полностью пустая
-            while (endRow <= lastRow) {
-              const rowVals = all[endRow - 1];
-              const isRowEmpty = rowVals.every(v => v === '' || v === null);
-              if (isRowEmpty) break;
-              endRow++;
-            }
-
-            const numRows = endRow - startRow;
-            if (numRows <= 0) continue;
-
-            const block = buildBlockWithMerges(sheet, startRow, numRows, lastCol);
-
-            const anchorA1 = colToLetter(c + 1) + startRow;
-            const link = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheet.getSheetId()}&range=${anchorA1}`;
-
-            results.push({
-              link,
-              sheet: sheetName,
-              startRow,
-              rows: block.numRows,
-              cols: block.numCols,
-              cells: block.cells
-            });
-
-            r += numRows - 1;
-            break;
+          // идём вниз, пока не встретим пустую строку
+          while (endRow <= lastRow) {
+            const rowVals = all[endRow - 1];
+            const isRowEmpty = rowVals.every(v => v === '' || v === null);
+            if (isRowEmpty) break;
+            endRow++;
           }
+
+          const numRows = endRow - startRow;
+          if (numRows <= 0) continue;
+
+          const values = sheet.getRange(startRow, 1, numRows, 2).getValues();
+
+          const block = values.map(row => ({
+            code: row[0],
+            name: row[1]
+          }));
+
+          const link = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheet.getSheetId()}&range=${startRow}:${endRow}`;
+
+          results.push({
+            link,
+            sheet: sheetName,
+            startRow,
+            rows: numRows,
+            cols: 2,
+            data: block
+          });
+
+          break; // нашли — дальше можно не искать
         }
       }
     });
@@ -85,12 +85,4 @@ function colToLetter(col) {
     col = (col - temp - 1) / 26;
   }
   return letter;
-}
-
-function buildBlockWithMerges(sheet, startRow, numRows, numCols) {
-  const values = sheet.getRange(startRow, 1, numRows, numCols).getValues();
-  const cells = values.map(row =>
-    row.map(v => ({ v, rowspan: 1, colspan: 1, show: true }))
-  );
-  return { numRows, numCols, cells };
 }

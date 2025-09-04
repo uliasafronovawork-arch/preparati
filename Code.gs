@@ -19,13 +19,14 @@ function searchICDCodePublic(code) {
       const lastRow = sheet.getLastRow();
       if (!lastRow) return;
 
-      const all = sheet.getRange(1, 1, lastRow, 2).getValues(); // только код + название
+      // читаем сразу только два столбца (A и B)
+      const all = sheet.getRange(1, 1, lastRow, 2).getValues();
 
       for (let r = 0; r < lastRow; r++) {
-        const codeVal = all[r][0]; // первый столбец (код)
-        if (!codeVal) continue;
+        const val = all[r][0]; // ищем код только в колонке A
+        if (!val) continue;
 
-        const match = String(codeVal).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
+        const match = String(val).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
         if (!match) continue;
 
         const cellCode = normalizeCode(match[0]);
@@ -33,10 +34,10 @@ function searchICDCodePublic(code) {
           let startRow = r + 1;
           let endRow = startRow;
 
-          // идём вниз, пока не пусто одновременно и в коде, и в названии
+          // идём вниз, пока не встретим полностью пустую строку (и A, и B пустые)
           while (endRow <= lastRow) {
             const rowVals = all[endRow - 1];
-            const isRowEmpty = (!rowVals[0] && !rowVals[1]); 
+            const isRowEmpty = (!rowVals[0] && !rowVals[1]);
             if (isRowEmpty) break;
             endRow++;
           }
@@ -44,6 +45,7 @@ function searchICDCodePublic(code) {
           const numRows = endRow - startRow;
           if (numRows <= 0) continue;
 
+          // берём только A и B в найденном блоке
           const values = sheet.getRange(startRow, 1, numRows, 2).getValues();
 
           const block = values.map(row => ({
@@ -62,7 +64,7 @@ function searchICDCodePublic(code) {
             data: block
           });
 
-          break; // нашли совпадение → дальше искать не нужно
+          break; // нашли — дальше не ищем
         }
       }
     });
@@ -75,14 +77,4 @@ function searchICDCodePublic(code) {
 
 function normalizeCode(code) {
   return String(code).toUpperCase().replace(/\s+/g, '');
-}
-
-function colToLetter(col) {
-  let temp, letter = '';
-  while (col > 0) {
-    temp = (col - 1) % 26;
-    letter = String.fromCharCode(temp + 65) + letter;
-    col = (col - temp - 1) / 26;
-  }
-  return letter;
 }

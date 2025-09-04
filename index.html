@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>ICD Search</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+      h2 { text-align: center; margin-bottom: 20px; }
+      
+      /* Контейнер поиска слева */
+      .search-container {
+        display: flex;
+        justify-content: flex-start; /* Слева */
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      input {
+        padding: 10px;
+        font-size: 16px;
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+      button {
+        padding: 10px 15px;
+        font-size: 16px;
+        cursor: pointer;
+        border: none;
+        background-color: #1976d2;
+        color: #fff;
+        border-radius: 6px;
+      }
+      table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+      td, th { border: 1px solid #999; padding: 5px; text-align: left; }
+      .block { margin-bottom: 30px; }
+      a { color: blue; text-decoration: underline; }
+      #results p { margin: 10px 0; }
+
+      /* Узкая колонка для номера */
+      td.num-col {
+        width: 60px;
+        text-align: center;
+      }
+
+      /* Выделение "Раздел" */
+      tr.section-row td {
+        font-weight: bold;
+        background-color: #f0f4ff;
+      }
+
+      @media (max-width: 480px) {
+        .search-container { flex-direction: column; align-items: stretch; }
+        button { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Поиск по ICD кодам</h2>
+
+    <div class="search-container">
+      <input type="text" id="codeInput" placeholder="Введите код, например 721">
+      <button id="searchBtn" onclick="searchCode()">Найти</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+      // Поиск по Enter
+      document.getElementById('codeInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('searchBtn').click();
+      });
+
+      function searchCode() {
+        const code = document.getElementById('codeInput').value.trim();
+        const resultsDiv = document.getElementById('results');
+        if (!code) {
+          resultsDiv.innerHTML = '<p style="color:red">Введите код</p>';
+          return;
+        }
+        resultsDiv.innerHTML = '<p>Идет поиск...</p>';
+        
+        google.script.run
+          .withSuccessHandler(renderResults)
+          .searchICDCodePublic(code);
+      }
+
+      function renderResults(results) {
+        const container = document.getElementById('results');
+        container.innerHTML = '';
+        
+        if (!results || results.length === 0) {
+          container.innerHTML = '<p>Ничего не найдено</p>';
+          return;
+        }
+        
+        results.forEach(result => {
+          if (result.error) {
+            const err = document.createElement('p');
+            err.style.color = 'red';
+            err.textContent = result.error;
+            container.appendChild(err);
+            return;
+          }
+
+          const blockDiv = document.createElement('div');
+          blockDiv.className = 'block';
+          
+          const link = document.createElement('a');
+          link.href = result.link;
+          link.target = '_blank';
+          link.textContent = `Лист: ${result.sheet}, строка ${result.startRow}`;
+          blockDiv.appendChild(link);
+
+          const table = document.createElement('table');
+
+          for (let r = 0; r < result.rows; r++) {
+            const tr = document.createElement('tr');
+
+            // первая строка (код, напр. 721) → объединяем под все колонки
+            if (r === 0) {
+              const td = document.createElement('td');
+              td.colSpan = result.cols;
+              td.textContent = result.cells[r][0].v;
+              td.style.fontWeight = 'bold';
+              td.style.textAlign = 'center';
+              tr.appendChild(td);
+              table.appendChild(tr);
+              continue;
+            }
+
+            let isSectionRow = false;
+
+            for (let c = 0; c < result.cols; c++) {
+              const cell = result.cells[r][c];
+              if (!cell.show) continue;
+
+              const td = document.createElement('td');
+              if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+              if (cell.colspan > 1) td.colSpan = cell.colspan;
+              td.textContent = cell.v;
+
+              // первая колонка → узкая
+              if (c === 0) td.className = 'num-col';
+
+              // проверяем "Раздел N"
+              if (typeof cell.v === 'string' && cell.v.trim().match(/^Раздел\s*\d+/i)) {
+                isSectionRow = true;
+              }
+
+              tr.appendChild(td);
+            }
+
+            if (isSectionRow) tr.className = 'section-row';
+
+            table.appendChild(tr);
+          }
+
+          blockDiv.appendChild(table);
+          container.appendChild(blockDiv);
+        });
+      }
+    </script>
+  </body>
+</html>

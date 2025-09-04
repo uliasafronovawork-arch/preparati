@@ -19,10 +19,10 @@ function searchICDCodePublic(code) {
       const lastRow = sheet.getLastRow();
       if (!lastRow) return;
 
-      const all = sheet.getRange(1, 1, lastRow, 2).getValues(); // только 2 колонки: код + название
+      const all = sheet.getRange(1, 1, lastRow, 2).getValues(); // только код + название
 
       for (let r = 0; r < lastRow; r++) {
-        const codeVal = all[r][0]; // первый столбец — код
+        const codeVal = all[r][0]; // первый столбец (код)
         if (!codeVal) continue;
 
         const match = String(codeVal).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
@@ -33,10 +33,10 @@ function searchICDCodePublic(code) {
           let startRow = r + 1;
           let endRow = startRow;
 
-          // идём вниз, пока не встретим пустую строку
+          // идём вниз, пока не пусто одновременно и в коде, и в названии
           while (endRow <= lastRow) {
             const rowVals = all[endRow - 1];
-            const isRowEmpty = rowVals.every(v => v === '' || v === null);
+            const isRowEmpty = (!rowVals[0] && !rowVals[1]); 
             if (isRowEmpty) break;
             endRow++;
           }
@@ -62,7 +62,7 @@ function searchICDCodePublic(code) {
             data: block
           });
 
-          break; // нашли — дальше можно не искать
+          break; // нашли совпадение → дальше искать не нужно
         }
       }
     });

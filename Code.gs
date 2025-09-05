@@ -83,11 +83,12 @@ function searchICDCodePublic(query) {
         if (lastRow > 0) {
           const all = sheet.getRange(1, 1, lastRow, 2).getValues();
           let foundRow = null;
+          const queryLower = searchQuery.toLowerCase();
 
           for (let r = 0; r < lastRow; r++) {
-            const valA = cleanSheetText(all[r][0]);
-            const valB = cleanSheetText(all[r][1]);
-            if (isFuzzyMatch(valA, searchQuery) || isFuzzyMatch(valB, searchQuery)) {
+            const valA = cleanSheetText(all[r][0]).toLowerCase();
+            const valB = cleanSheetText(all[r][1]).toLowerCase();
+            if (valA.includes(queryLower) || valB.includes(queryLower)) {
               foundRow = r + 1;
               break;
             }
@@ -124,7 +125,7 @@ function searchICDCodePublic(query) {
 
     if (results.length === 0) {
       return [{
-        error: `По запросу "${query}" ничего не найдено. Проверьте листы "часть 1" или "часть 2".`
+        error: `По запросу "${query}" ничего не найдено. Проверьте листы "часть 1" или "часть 0".`
       }];
     }
 
@@ -138,34 +139,4 @@ function searchICDCodePublic(query) {
 // нормализация кода (для листа 1)
 function normalizeCode(code) {
   return String(code).toUpperCase().replace(/\s+/g, '');
-}
-
-// ==== Умный поиск для листа 0 ====
-function isFuzzyMatch(text, query) {
-  if (!text || !query) return false;
-
-  text = text.toLowerCase().replace(/\s+/g, ' ').trim();
-  query = query.toLowerCase().replace(/\s+/g, ' ').trim();
-
-  if (text.includes(query)) return true; // прямое вхождение
-
-  // fuzzy по словам
-  const words = text.split(' ');
-  return words.some(word => levenshteinDistance(word, query) <= 2); // допускаем 2 ошибки
-}
-
-// Расстояние Левенштейна
-function levenshteinDistance(a, b) {
-  const m = [];
-  for (let i = 0; i <= b.length; i++) m[i] = [i];
-  for (let j = 0; j <= a.length; j++) m[0][j] = j;
-
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      m[i][j] = b.charAt(i - 1) === a.charAt(j - 1)
-        ? m[i - 1][j - 1]
-        : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
-    }
-  }
-  return m[b.length][a.length];
 }

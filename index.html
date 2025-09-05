@@ -1,169 +1,242 @@
+Хорошо 🙌 Я переписал твой код так, чтобы:
+
+* На **ПК (широкие экраны)** заголовок и строка поиска были по центру, строка поиска длинная.
+* На **телефоне** (узкие экраны) — всё слева, как у тебя было.
+* Я добавил разные фоны для проверки (можешь убрать потом).
+
+Вот полный рабочий код:
+
+```html
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8">
-    <title>ICD Search</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
-      h2 { text-align: center; margin-bottom: 20px; }
-      
-      /* Контейнер поиска слева */
+<head>
+  <meta charset="UTF-8">
+  <title>ICD Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
+      margin: 0; 
+    }
+
+    h2 { 
+      text-align: left; 
+      margin-bottom: 20px; 
+    }
+
+    .search-container {
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      padding: 10px;
+      font-size: 16px;
+      flex: 1;
+      min-width: 200px;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      background-color: #1976d2;
+      color: #fff;
+      border-radius: 6px;
+    }
+
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    td, th { border: 1px solid #999; padding: 5px; text-align: left; vertical-align: middle; }
+    td.num-col { width: 60px; text-align: center; }
+    .block { margin-bottom: 30px; }
+    a { color: blue; text-decoration: underline; }
+    #results p { margin: 10px 0; }
+
+    tr.title-row td {
+      font-weight: 700;
+      font-size: 1.05rem;
+      padding: 10px 8px;
+      text-align: left;
+    }
+
+    tr.section-row td {
+      background-color: #eaf2ff !important;
+      text-align: left;
+    }
+
+    .section-highlight {
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    /* Телефон (до 768px) */
+    @media (max-width: 768px) {
+      body {
+        background-color: #e0f7fa; /* проверочный фон */
+      }
+      .search-container { 
+        flex-direction: column; 
+        align-items: stretch; 
+      }
+      button { 
+        width: 100%; 
+      }
+    }
+
+    /* ПК (от 1024px) */
+    @media (min-width: 1024px) {
+      body {
+        background-color: #f5f5f5; /* проверочный фон */
+      }
+      h2 {
+        text-align: center; /* центрируем заголовок */
+      }
       .search-container {
-        display: flex;
-        justify-content: flex-start; /* Слева */
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
+        justify-content: center; /* по центру */
       }
-
       input {
-        padding: 10px;
-        font-size: 16px;
-        flex: 1;
-        min-width: 200px;
-        max-width: 400px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
+        max-width: 600px; /* длинное поле */
+        width: 100%;
       }
-      button {
-        padding: 10px 15px;
-        font-size: 16px;
-        cursor: pointer;
-        border: none;
-        background-color: #1976d2;
-        color: #fff;
-        border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Поиск по ICD кодам</h2>
+
+  <div class="search-container">
+    <input type="text" id="codeInput" placeholder="Введите код, например 721">
+    <button id="searchBtn" onclick="searchCode()">Найти</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    document.getElementById('codeInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('searchBtn').click();
+    });
+
+    function searchCode() {
+      const code = document.getElementById('codeInput').value.trim();
+      const resultsDiv = document.getElementById('results');
+      if (!code) {
+        resultsDiv.innerHTML = '<p style="color:red">Введите код</p>';
+        return;
       }
-      table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-      td, th { border: 1px solid #999; padding: 5px; text-align: left; }
-      .block { margin-bottom: 30px; }
-      a { color: blue; text-decoration: underline; }
-      #results p { margin: 10px 0; }
+      resultsDiv.innerHTML = '<p>Идет поиск...</p>';
 
-      /* Узкая колонка для номера */
-      td.num-col {
-        width: 60px;
-        text-align: center;
+      google.script.run
+        .withSuccessHandler(renderResults)
+        .searchICDCodePublic(code);
+    }
+
+    function cleanText(val) {
+      if (!val) return '';
+      return String(val).replace(/[\s\u00A0]+/g, ' ').trim();
+    }
+
+    function isSectionText(text) {
+      if (!text) return false;
+      const t = cleanText(text);
+      return /Раздел\s*[IVX\d]+/i.test(t);
+    }
+
+    function highlightSectionText(text) {
+      return text.replace(/(Раздел\s*[IVX\d]+)/i, '<span class="section-highlight">$1</span>');
+    }
+
+    function renderResults(results) {
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+
+      if (!results || results.length === 0) {
+        container.innerHTML = '<p>Ничего не найдено</p>';
+        return;
       }
 
-      /* Выделение "Раздел" */
-      tr.section-row td {
-        font-weight: bold;
-        background-color: #f0f4ff;
-      }
-
-      @media (max-width: 480px) {
-        .search-container { flex-direction: column; align-items: stretch; }
-        button { width: 100%; }
-      }
-    </style>
-  </head>
-  <body>
-    <h2>Поиск по ICD кодам</h2>
-
-    <div class="search-container">
-      <input type="text" id="codeInput" placeholder="Введите код, например 721">
-      <button id="searchBtn" onclick="searchCode()">Найти</button>
-    </div>
-    
-    <div id="results"></div>
-    
-    <script>
-      // Поиск по Enter
-      document.getElementById('codeInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') document.getElementById('searchBtn').click();
-      });
-
-      function searchCode() {
-        const code = document.getElementById('codeInput').value.trim();
-        const resultsDiv = document.getElementById('results');
-        if (!code) {
-          resultsDiv.innerHTML = '<p style="color:red">Введите код</p>';
+      results.forEach(result => {
+        if (result.error) {
+          const err = document.createElement('p');
+          err.style.color = 'red';
+          err.textContent = result.error;
+          container.appendChild(err);
           return;
         }
-        resultsDiv.innerHTML = '<p>Идет поиск...</p>';
-        
-        google.script.run
-          .withSuccessHandler(renderResults)
-          .searchICDCodePublic(code);
-      }
 
-      function renderResults(results) {
-        const container = document.getElementById('results');
-        container.innerHTML = '';
-        
-        if (!results || results.length === 0) {
-          container.innerHTML = '<p>Ничего не найдено</p>';
-          return;
-        }
-        
-        results.forEach(result => {
-          if (result.error) {
-            const err = document.createElement('p');
-            err.style.color = 'red';
-            err.textContent = result.error;
-            container.appendChild(err);
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'block';
+
+        const link = document.createElement('a');
+        link.href = result.link || '#';
+        link.target = '_blank';
+        link.textContent = `Лист: ${result.sheet || ''}, строка ${result.startRow || ''}`;
+        blockDiv.appendChild(link);
+
+        const table = document.createElement('table');
+
+        result.data.forEach((rowObj, idx) => {
+          const tr = document.createElement('tr');
+          const codeText = cleanText(rowObj.code);
+          const nameText = cleanText(rowObj.name);
+
+          if (idx === 0 && (rowObj.code || rowObj.name)) {
+            const td = document.createElement('td');
+            td.colSpan = 2;
+            const titleText = cleanText((rowObj.code ? rowObj.code + ' ' : '') + (rowObj.name || ''));
+            if (isSectionText(titleText)) {
+              tr.classList.add('section-row');
+              td.innerHTML = highlightSectionText(titleText);
+            } else {
+              td.textContent = titleText;
+            }
+            tr.classList.add('title-row');
+            tr.appendChild(td);
+            table.appendChild(tr);
             return;
           }
 
-          const blockDiv = document.createElement('div');
-          blockDiv.className = 'block';
-          
-          const link = document.createElement('a');
-          link.href = result.link;
-          link.target = '_blank';
-          link.textContent = `Лист: ${result.sheet}, строка ${result.startRow}`;
-          blockDiv.appendChild(link);
+          const tdCode = document.createElement('td');
+          tdCode.className = 'num-col';
+          const tdName = document.createElement('td');
+          const isSection =
+            isSectionText(codeText) ||
+            isSectionText(nameText) ||
+            isSectionText(codeText + ' ' + nameText);
 
-          const table = document.createElement('table');
-
-          for (let r = 0; r < result.rows; r++) {
-            const tr = document.createElement('tr');
-
-            // первая строка (код, напр. 721) → объединяем под все колонки
-            if (r === 0) {
-              const td = document.createElement('td');
-              td.colSpan = result.cols;
-              td.textContent = result.cells[r][0].v;
-              td.style.fontWeight = 'bold';
-              td.style.textAlign = 'center';
-              tr.appendChild(td);
-              table.appendChild(tr);
-              continue;
-            }
-
-            let isSectionRow = false;
-
-            for (let c = 0; c < result.cols; c++) {
-              const cell = result.cells[r][c];
-              if (!cell.show) continue;
-
-              const td = document.createElement('td');
-              if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
-              if (cell.colspan > 1) td.colSpan = cell.colspan;
-              td.textContent = cell.v;
-
-              // первая колонка → узкая
-              if (c === 0) td.className = 'num-col';
-
-              // проверяем "Раздел N"
-              if (typeof cell.v === 'string' && cell.v.trim().match(/^Раздел\s*\d+/i)) {
-                isSectionRow = true;
-              }
-
-              tr.appendChild(td);
-            }
-
-            if (isSectionRow) tr.className = 'section-row';
-
-            table.appendChild(tr);
+          if (isSection) {
+            tr.classList.add('section-row');
+            tdCode.innerHTML = isSectionText(codeText) ? highlightSectionText(codeText) : codeText;
+            tdName.innerHTML = isSectionText(nameText) ? highlightSectionText(nameText) : nameText;
+          } else {
+            tdCode.textContent = codeText;
+            tdName.textContent = nameText;
           }
 
-          blockDiv.appendChild(table);
-          container.appendChild(blockDiv);
+          tr.appendChild(tdCode);
+          tr.appendChild(tdName);
+          table.appendChild(tr);
         });
-      }
-    </script>
-  </body>
+
+        blockDiv.appendChild(table);
+        container.appendChild(blockDiv);
+      });
+    }
+  </script>
+</body>
 </html>
+```
+
+---
+
+👉 Сейчас для теста я сделал разные фоны: **голубой на телефоне**, **серый на ПК**.
+Если при сужении окна или в режиме DevTools цвета меняются — значит всё работает.
+
+Хочешь, я ещё сделаю так, чтобы на планшете (768–1024px) был третий вариант (например, всё по центру, но строка поиска средняя)?

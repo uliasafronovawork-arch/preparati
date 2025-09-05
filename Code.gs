@@ -30,9 +30,8 @@ function searchICDCodePublic(query) {
       if (lastRow < 1) return;
 
       const all = sheet.getRange(1, 1, lastRow, 2).getValues();
-
-      let foundRow = null;
       const normCode = normalizeCode(searchQuery);
+      let foundRow = null;
 
       for (let r = 0; r < lastRow; r++) {
         const val = all[r][0]; // колонка A
@@ -52,8 +51,7 @@ function searchICDCodePublic(query) {
         let endRow = foundRow;
         while (endRow <= lastRow) {
           const rowVals = all[endRow - 1];
-          const isEmptyRow = (!rowVals[0] && !rowVals[1]);
-          if (isEmptyRow) break;
+          if (!rowVals[0] && !rowVals[1]) break; // пустая строка
           endRow++;
         }
 
@@ -98,8 +96,7 @@ function searchICDCodePublic(query) {
             let endRow = foundRow;
             while (endRow <= lastRow) {
               const rowVals = all[endRow - 1];
-              const isEmptyRow = (!rowVals[0] && !rowVals[1]);
-              if (isEmptyRow) break;
+              if (!rowVals[0] && !rowVals[1]) break;
               endRow++;
             }
 

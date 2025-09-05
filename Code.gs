@@ -4,88 +4,96 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function searchICDCodePublic(code) {
+function searchICDCodePublic(query) {
   try {
-    const searchCode = normalizeCode(code || '');
+    const searchRaw = query ? String(query).trim() : '';
+    if (!searchRaw) {
+      return [{ error: 'Введите код или название заболевания' }];
+    }
+
+    const searchCode = normalizeCode(searchRaw); // вариант для кода
+    const searchText = searchRaw.toLowerCase();  // вариант для текста
+
     const spreadsheetId = '1zS0DoyXg6GE0rsOr1NLkDdljplc1GXU1cNVCZRgS1rQ';
     const ss = SpreadsheetApp.openById(spreadsheetId);
-    const sheetsToSearch = ['часть 1', 'часть 2'];
-    const MAX_BLOCK_ROWS = 500; // защита от "бесконечного" прохода
+
+    // два листа: в одном коды, в другом названия
+    const sheetsToSearch = [
+      { name: 'часть 1', mode: 'code' }, // ищем строго по коду
+      { name: 'часть 0', mode: 'text' }  // ищем по словам
+    ];
 
     const results = [];
 
-    for (const sheetName of sheetsToSearch) {
-      const sheet = ss.getSheetByName(sheetName);
+    function cleanSheetText(str) {
+      if (!str) return '';
+      return String(str).replace(/[\u00A0]+/g, ' ').trim();
+    }
+
+    for (const sheetDef of sheetsToSearch) {
+      const sheet = ss.getSheetByName(sheetDef.name);
       if (!sheet) continue;
 
       const lastRow = sheet.getLastRow();
       if (lastRow < 1) continue;
 
-      // 1) Ищем код ТОЛЬКО в колонке A
-      const colA = sheet.getRange(1, 1, lastRow, 1).getValues();
-      let foundRow = null; // 1-based
+      const all = sheet.getRange(1, 1, lastRow, 2).getValues();
 
-      for (let i = 0; i < colA.length; i++) {
-        const v = colA[i][0];
-        if (v === '' || v === null) continue;
+      let foundRow = null;
+      for (let r = 0; r < lastRow; r++) {
+        const cellA = cleanSheetText(all[r][0]);
+        const cellB = cleanSheetText(all[r][1]);
 
-        // Берём первый токен вида "721" или "A12.3"
-        const m = String(v).trim().match(/^[A-Za-zА-Яа-я0-9.]+/);
-        if (!m) continue;
-
-        if (normalizeCode(m[0]) === searchCode) {
-          foundRow = i + 1; // в Apps Script индексация с 1
-          break;
+        if (sheetDef.mode === 'code') {
+          // проверка по коду (строгое совпадение в колонке A)
+          const cellCode = normalizeCode(cellA);
+          if (cellCode === searchCode) {
+            foundRow = r + 1;
+            break;
+          }
+        } else if (sheetDef.mode === 'text') {
+          // поиск текста (вхождение в A или B)
+          if ((cellA && cellA.toLowerCase().includes(searchText)) ||
+              (cellB && cellB.toLowerCase().includes(searchText))) {
+            foundRow = r + 1;
+            break;
+          }
         }
       }
 
       if (!foundRow) continue;
 
-      // 2) Собираем блок A+B от найденной строки до первой полностью пустой строки
-      const tail = sheet.getRange(foundRow, 1, lastRow - foundRow + 1, 2).getValues();
-
-      let length = 0;
-      for (let i = 0; i < tail.length && i < MAX_BLOCK_ROWS; i++) {
-        const a = tail[i][0];
-        const b = tail[i][1];
-        const isEmptyRow = (a === '' || a === null) && (b === '' || b === null);
-
-        // Останавливаемся на первой пустой строке ПОСЛЕ того как захватили хотя бы заголовок
-        if (isEmptyRow && i > 0) break;
-
-        // Если прямо первая строка пустая (редкий случай) — всё равно возьмём её как 1 строку
-        if (isEmptyRow && i === 0) { length = 1; break; }
-
-        length++;
+      // идём вниз до пустой строки
+      let endRow = foundRow;
+      while (endRow <= lastRow) {
+        const rowVals = all[endRow - 1];
+        const isEmptyRow = (!rowVals[0] && !rowVals[1]);
+        if (isEmptyRow) break;
+        endRow++;
       }
 
-      if (length === 0) length = 1; // на всякий случай
+      const blockValues = all.slice(foundRow - 1, endRow).map(r => ({
+        code: cleanSheetText(r[0]),
+        name: cleanSheetText(r[1])
+      }));
 
-      const endRow = foundRow + length - 1;
-      const values = tail.slice(0, length);
-      const data = values.map(r => ({ code: r[0], name: r[1] }));
-
-      const link = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheet.getSheetId()}&range=${foundRow}:${endRow}`;
+      const link = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheet.getSheetId()}&range=A${foundRow}:B${endRow-1}`;
 
       results.push({
         link,
-        sheet: sheetName,
+        sheet: sheetDef.name,
         startRow: foundRow,
-        rows: length,
+        rows: blockValues.length,
         cols: 2,
-        data
+        data: blockValues
       });
 
-      // Если коды уникальные — можно сразу выходить. Если нужно искать во всех листах — убери break.
-      break;
+      break; // выходим после первого найденного совпадения
     }
 
     if (results.length === 0) {
       return [{
-        error: `Код "${code}" не найден. Проверь, что:
-- он находится в колонке A,
-- листы называются "часть 1" и/или "часть 2",
-- между группами есть пустая строка (как ты описала).`
+        error: `По запросу "${query}" ничего не найдено в листах "часть 1" или "часть 0".`
       }];
     }
 
